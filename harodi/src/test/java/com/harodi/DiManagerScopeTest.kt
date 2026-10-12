@@ -7,6 +7,33 @@ import kotlin.test.assertSame
 
 class DiManagerScopeTest {
     @Test
+    fun `직접 요청한 의존성도 정책에 지정된 소유 스코프에서 재사용한다`() {
+        val diManager = createDiManager()
+        val applicationScope = createApplicationScope()
+        val firstViewModelScope = createViewModelScope(applicationScope)
+        val secondViewModelScope = createViewModelScope(applicationScope)
+        val applicationRepositoryKey = DependencyKey(ApplicationScopedRepository::class.java, null)
+        val viewModelRepositoryKey = DependencyKey(ViewModelScopedRepository::class.java, null)
+
+        val firstApplicationRepository = diManager.resolve(ApplicationScopedRepository::class.java, firstViewModelScope)
+        val secondApplicationRepository = diManager.resolve(ApplicationScopedRepository::class.java, secondViewModelScope)
+        val injectedRepository = diManager.resolve(ScopedConsumer::class.java, secondViewModelScope).applicationScopedRepository
+        val constructorInjectedRepository =
+            diManager.resolve(ConstructorScopedConsumer::class.java, secondViewModelScope).applicationScopedRepository
+        val firstViewModelRepository = diManager.resolve(ViewModelScopedRepository::class.java, firstViewModelScope)
+        val secondViewModelRepository = diManager.resolve(ViewModelScopedRepository::class.java, secondViewModelScope)
+
+        assertSame(firstApplicationRepository, secondApplicationRepository)
+        assertSame(firstApplicationRepository, injectedRepository)
+        assertSame(firstApplicationRepository, constructorInjectedRepository)
+        assertSame(firstApplicationRepository, diManager.searchScope(applicationScope, applicationRepositoryKey))
+        assertNull(diManager.searchScope(firstViewModelScope, applicationRepositoryKey))
+        assertNull(diManager.searchScope(secondViewModelScope, applicationRepositoryKey))
+        assertNotSame(firstViewModelRepository, secondViewModelRepository)
+        assertSame(firstViewModelRepository, diManager.searchScope(firstViewModelScope, viewModelRepositoryKey))
+    }
+
+    @Test
     fun `같은 ViewModel 스코프에서는 같은 인스턴스를 반환하고 다른 ViewModel 스코프에서는 다른 인스턴스를 반환한다`() {
         // given
         val diManager = createDiManager()
@@ -149,6 +176,10 @@ class ScopedConsumer {
     @Inject
     lateinit var applicationScopedRepository: ApplicationScopedRepository
 }
+
+class ConstructorScopedConsumer(
+    val applicationScopedRepository: ApplicationScopedRepository,
+)
 
 class ViewModelScopedRepository
 

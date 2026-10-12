@@ -20,6 +20,25 @@ import woowacourse.shopping.ui.products.ProductsViewModel
 @RunWith(RobolectricTestRunner::class)
 class DiManagerTest {
     @Test
+    fun `서로 다른 ViewModel 스코프의 직접 조회와 필드 주입은 앱 스코프 CartRepository를 공유한다`() {
+        val diManager = createDiManager()
+        val applicationScope = createApplicationScope()
+        val firstViewModelScope = createViewModelScope(applicationScope)
+        val secondViewModelScope = createViewModelScope(applicationScope)
+        val repositoryKey = DependencyKey(CartRepository::class.java, DefaultCart::class)
+
+        val firstRepository = diManager.resolve(CartRepository::class.java, firstViewModelScope, DefaultCart::class)
+        val secondRepository = diManager.resolve(CartRepository::class.java, secondViewModelScope, DefaultCart::class)
+        val injectedRepository = diManager.resolve(CartViewModel::class.java, secondViewModelScope).cartRepository
+
+        assertThat(secondRepository).isSameInstanceAs(firstRepository)
+        assertThat(injectedRepository).isSameInstanceAs(firstRepository)
+        assertThat(diManager.searchScope(applicationScope, repositoryKey)).isSameInstanceAs(firstRepository)
+        assertThat(diManager.searchScope(firstViewModelScope, repositoryKey)).isNull()
+        assertThat(diManager.searchScope(secondViewModelScope, repositoryKey)).isNull()
+    }
+
+    @Test
     fun `ViewModel을 받았을 때 해당 ViewModel이 어떤 클래스인지 알 수 있다`() {
         // given
         val diManager = createDiManager()

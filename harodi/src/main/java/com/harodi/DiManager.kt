@@ -128,24 +128,17 @@ class DiManager {
         return dependencyKey.classType
     }
 
-    // 객체를 탐색한다.
-    // 지금은 생성까지 하고 있따. 역할을 분리할 필요가 있따.
+    // 주입 대상의 스코프 정책을 확인하고 동일한 resolve 경로로 탐색하거나 생성한다.
     internal fun searchInstance(
         dependencyKey: DependencyKey,
         scopeKey: ScopeKey,
     ): Any {
-        val scopeInstance = searchScope(scopeKey, dependencyKey)
-        if (scopeInstance != null) {
-            return scopeInstance
-        } else {
-            val instance =
-                resolve(
-                    modelClass = dependencyKey.classType,
-                    qualifier = dependencyKey.qualifier,
-                    scopeKey = scopeKey,
-                )
-            return instance
-        }
+        searchScopePolicy(dependencyKey.classType, dependencyKey.qualifier)
+        return resolve(
+            modelClass = dependencyKey.classType,
+            qualifier = dependencyKey.qualifier,
+            scopeKey = scopeKey,
+        )
     }
 
     // 객체를 생성한다.
@@ -172,9 +165,7 @@ class DiManager {
                                 }
                             }?.annotationClass
                     val dependencyKey = DependencyKey(type.java, qualifier)
-                    val targetScopeKind = searchScopePolicy(type.java, qualifier)
-                    val ownerScopeKey = findOwnerScopeKey(targetScopeKind, scopeKey)!!
-                    searchInstance(dependencyKey, ownerScopeKey)
+                    searchInstance(dependencyKey, scopeKey)
                 }
             return constructor.call(*typesConstructors.toTypedArray())
         }
@@ -209,9 +200,7 @@ class DiManager {
                         }?.annotationClass
                 isAccessible = true
                 val dependencyKey = DependencyKey(dependancyKClass.java, qualifier)
-                val targetScopeKind = searchScopePolicy(dependancyKClass.java, qualifier)
-                val ownerScopeKey = findOwnerScopeKey(targetScopeKind, scopeKey)!!
-                set(instance, searchInstance(dependencyKey, ownerScopeKey))
+                set(instance, searchInstance(dependencyKey, scopeKey))
             }
         }
     }
@@ -236,16 +225,21 @@ class DiManager {
         qualifier: KClass<out Annotation>? = null,
     ): T {
         val dependencyKey = DependencyKey(modelClass, qualifier)
-        if (searchScope(scopeKey, dependencyKey) != null) {
-            return searchScope(scopeKey, dependencyKey) as T
-        }
-        val instance = createInstance(dependencyKey, scopeKey)
+        val ownerScopeKey =
+            scopePolicyMap[dependencyKey]?.let { scopeKind ->
+                findOwnerScopeKey(scopeKind, scopeKey)
+                    ?: throw IllegalArgumentException("${dependencyKey.classType}의 $scopeKind 스코프를 찾을 수 없습니다.")
+            } ?: scopeKey
+        val existingInstance = searchScope(ownerScopeKey, dependencyKey)
+        if (existingInstance != null) return existingInstance as T
+
+        val instance = createInstance(dependencyKey, ownerScopeKey)
 
         val lateinitProperties = searchLateinitProperty(modelClass)
         if (lateinitProperties != null) {
-            fieldInject(modelClass, instance as T, lateinitProperties, scopeKey)
+            fieldInject(modelClass, instance as T, lateinitProperties, ownerScopeKey)
         }
-        addScope(scopeKey, dependencyKey.classType, dependencyKey.qualifier, instance)
+        addScope(ownerScopeKey, dependencyKey.classType, dependencyKey.qualifier, instance)
         return instance as T
     }
 }
