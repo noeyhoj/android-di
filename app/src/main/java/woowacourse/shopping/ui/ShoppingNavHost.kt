@@ -35,14 +35,15 @@ fun ShoppingNavHost(
                 viewModel = viewModel(factory = viewModelFactory),
             )
         }
-        composable(ShoppingRoute.CART) {
+        composable(ShoppingRoute.CART) { navBackStackEntry ->
             DiScreen(
                 diManager = diManager,
                 parentKey = applicationKey,
-            ) { dateFormatter ->
+                navBackStackEntry = navBackStackEntry,
+            ) { cartViewModel, dateFormatter ->
                 CartScreen(
                     onNavigateUp = { navController.navigateUp() },
-                    viewModel = viewModel(factory = viewModelFactory),
+                    viewModel = cartViewModel,
                     dateFormatter = dateFormatter,
                 )
             }

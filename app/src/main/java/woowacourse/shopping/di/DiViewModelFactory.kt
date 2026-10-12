@@ -8,6 +8,7 @@ import com.harodi.ScopeKey
 class DiViewModelFactory(
     private val diManager: DiManager,
     private val parentKey: ScopeKey,
+    private val screenScopeKey: ScopeKey? = null,
 ) : ViewModelProvider.Factory {
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         val viewModelScopeKey =
@@ -19,6 +20,7 @@ class DiViewModelFactory(
 
         viewModel.addCloseable {
             diManager.removeScope(viewModelScopeKey)
+            screenScopeKey?.let(diManager::removeScope)
         }
 
         return viewModel
